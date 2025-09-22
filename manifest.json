@@ -1,6 +1,6 @@
 {
-  "name": "GO FARM",
-  "short_name": "WebApps",
+  "name": "krishi officer",
+  "short_name": "kishan app",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -18,3 +18,4 @@
     }
   ]
 }
+
