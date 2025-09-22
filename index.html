@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Digital Krishi Officer - Chat</title>
+       <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#007bff">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --primary-green: #086654;
+            --secondary-green: #008069;
+            --accent-green-bright: #25D366;
+            --accent-green-dark: #1EBE57;
+            --user-bubble-bg: #E7FFDB;
+            --ai-bubble-bg: #FFFFFF;
+            --background-color: #F0F2F5;
+            --app-background: #E8EBEA;
+            --text-primary: #111B21;
+            --text-secondary: #667781;
+            --panel-header-bg: #F0F2F5;
+            --border-color: rgba(0, 0, 0, 0.08);
+            --shadow-light: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+        body {
+            font-family: 'Manrope', sans-serif;
+            overscroll-behavior-y: contain;
+            touch-action: manipulation;
+            background-color: var(--background-color);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        main {
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        #chat-window {
+            position: relative;
+            background-image: url('https://www.toptal.com/designers/subtlepatterns/uploads/double-bubble-outline.png');
+            background-color: var(--app-background);
+            z-index: 1;
+        }
+        .chat-bubble {
+            position: relative;
+            padding: 8px 14px;
+            border-radius: 12px;
+            max-width: 85%;
+            word-wrap: break-word;
+            box-shadow: var(--shadow-light);
+            transition: transform 0.2s ease-out;
+        }
+         .chat-bubble strong {
+            color: var(--primary-green);
+        }
+        .chat-bubble-user {
+            background-color: var(--user-bubble-bg);
+            border-bottom-right-radius: 4px;
+        }
+        .chat-bubble-ai {
+            background-color: var(--ai-bubble-bg);
+            border-bottom-left-radius: 4px;
+        }
+        .smart-tool-btn {
+             background: var(--ai-bubble-bg);
+             border: 1px solid var(--border-color);
+             box-shadow: var(--shadow-md);
+        }
+        .smart-tool-btn:hover {
+            border-color: rgba(0,0,0,0.12);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+        }
+        .smart-tool-btn i {
+            background: linear-gradient(135deg, var(--primary-green), var(--secondary-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .timestamp {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        .ticks {
+            font-size: 0.7rem;
+            color: #53bdeb; /* Blue ticks for read status */
+            margin-left: 4px;
+        }
+        @keyframes slide-in-fade {
+            from { opacity: 0; transform: translateY(12px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .new-message {
+            animation: slide-in-fade 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+        }
+        .typing-indicator span {
+            height: 7px; width: 7px; margin: 0 2px;
+            background-color: #9ca3af; display: inline-block;
+            border-radius: 50%; animation: 1.2s blink infinite;
+        }
+        .typing-indicator span:nth-child(2) { animation-delay: .2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: .4s; }
+        @keyframes blink {
+            0%, 100% { opacity: 0.3; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1); }
+        }
+        #chat-window::-webkit-scrollbar { width: 6px; }
+        #chat-window::-webkit-scrollbar-track { background: transparent; }
+        #chat-window::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,0.25); border-radius: 3px; }
+        
+        #action-btn {
+            background: linear-gradient(135deg, var(--accent-green-bright), var(--accent-green-dark));
+        }
+        
+        .mic-recording::after {
+            content: '';
+            position: absolute;
+            inset: -8px;
+            background-color: rgba(239, 68, 68, 0.5);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+            z-index: -1;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.8); opacity: 0.7; }
+            70% { transform: scale(1.3); opacity: 0; }
+            100% { transform: scale(1.3); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-gray-200">
+
+    <main class="w-full h-full">
+        <div id="chat-container" class="bg-white flex flex-col w-full max-w-lg mx-auto md:shadow-2xl md:h-full">
+            <!-- Header -->
+            <header class="bg-panel-header-bg text-gray-800 p-3 flex items-center justify-between border-b border-gray-200 flex-shrink-0 z-10">
+                <div class="flex items-center">
+                    <img src="https://img.icons8.com/color/48/bot.png" onerror="this.onerror=null;this.src='https://placehold.co/40x40/FFFFFF/333333?text=AI';" class="w-10 h-10 rounded-full mr-3 bg-white p-1 shadow-sm">
+                    <div>
+                        <h3 class="font-bold text-base tracking-wide text-text-primary">AI Krishi Officer</h3>
+                        <p class="text-xs text-text-secondary flex items-center"><span class="w-2 h-2 bg-green-500 rounded-full mr-1.5"></span>Typically replies instantly</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-1">
+                    <button id="lang-toggle-btn" class="text-text-secondary hover:bg-gray-200 rounded-full p-2.5 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--primary-green)]" title="Change Language"><i class="fas fa-language text-lg"></i></button>
+                    <button id="escalate-btn" class="text-text-secondary hover:bg-gray-200 rounded-full p-2.5 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--primary-green)]" title="Call Officer"><i class="fas fa-phone text-lg"></i></button>
+                </div>
+            </header>
+            
+            <!-- Chat Window -->
+            <div id="chat-window" class="p-4 flex-1 overflow-y-auto flex flex-col space-y-4">
+                <!-- Messages will be injected here -->
+            </div>
+            
+            <!-- Features & Quick Replies Container -->
+            <div id="action-buttons-container" class="px-4 pb-2 border-t border-gray-200 bg-white"></div>
+
+            <!-- Typing Indicator Area -->
+            <div id="typing-indicator-container" class="hidden p-4">
+                 <div class="chat-bubble chat-bubble-ai p-3 rounded-lg max-w-min">
+                    <div class="typing-indicator flex items-center justify-center h-4">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            </div>
+
+             <!-- Image Preview Area -->
+            <div id="image-preview-container" class="hidden p-3 bg-white border-t items-center transition-all duration-300">
+                <div class="relative w-14 h-14">
+                    <img id="preview-image" src="" class="w-14 h-14 rounded-lg object-cover shadow-sm">
+                    <button id="remove-image-btn" class="absolute -top-1.5 -right-1.5 bg-gray-800 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors shadow-lg">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                 <p class="text-sm text-gray-600 font-medium flex-1 ml-4">Image ready to send</p>
+            </div>
+
+            <!-- Input Area -->
+            <footer class="p-3 bg-panel-header-bg flex items-center space-x-3 flex-shrink-0 border-t border-gray-200">
+                <div class="flex-1 flex items-center bg-white rounded-full shadow-sm px-3">
+                    <input type="file" id="image-upload-input" accept="image/*" class="hidden">
+                    <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden">
+                    
+                    <div id="attachment-menu" class="relative">
+                         <button id="attachment-btn" class="p-2 text-text-secondary hover:text-[var(--primary-green)] rounded-full transition-colors" title="Attach file">
+                            <i class="fas fa-paperclip text-xl"></i>
+                        </button>
+                        <div id="attachment-options" class="hidden absolute bottom-full mb-2 -left-1 bg-white rounded-xl shadow-lg py-2 w-48 border border-gray-100">
+                             <a href="#" id="upload-btn-menu" class="flex items-center px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100">
+                                <i class="fas fa-photo-video w-6 mr-3 text-[var(--secondary-green)]"></i> Gallery
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <input type="text" id="chat-input" placeholder="Ask me anything..." class="flex-1 px-2 py-3 border-none focus:outline-none focus:ring-0 bg-transparent text-gray-800 placeholder-gray-400">
+                    
+                    <button id="camera-btn" class="p-2 text-text-secondary hover:text-[var(--primary-green)] rounded-full transition-colors" title="Take a photo">
+                        <i class="fas fa-camera text-xl"></i>
+                    </button>
+                </div>
+                <button id="action-btn" class="relative text-white w-12 h-12 rounded-full transition-all duration-300 flex items-center justify-center flex-shrink-0 shadow-lg transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-green-dark)]">
+                    <i id="action-btn-icon" class="fas fa-microphone text-lg"></i>
+                </button>
+            </footer>
+        </div>
+    </main>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="hidden fixed bottom-24 right-1/2 translate-x-1/2 md:right-4 md:translate-x-0 bg-gray-900 bg-opacity-90 text-white px-5 py-2.5 rounded-full shadow-lg text-sm font-medium transition-all duration-300 backdrop-blur-sm">Message</div>
+    
+    <!-- Image Modal -->
+    <div id="image-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <span id="modal-close-btn" class="absolute top-4 right-4 text-white/80 hover:text-white text-4xl font-light cursor-pointer">&times;</span>
+        <img id="modal-image" src="" alt="Full-size view of uploaded image" class="max-w-full max-h-full rounded-lg shadow-2xl">
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- API KEYS & CONFIGURATION (IMPORTANT: Replace placeholders with your own keys/data) ---
+            const GEMINI_API_KEY = 'AIzaSyCVlZ9p_XcbKRW8JmBaBv5n4jJdB6VQrWU'; // Your Gemini API key is now integrated.
+            const OFFICER_MOBILE_NUMBER = 'REPLACE_WITH_YOUR_MOBILE_NUMBER'; // <-- Add your 10-digit mobile number here
+            const OPENWEATHER_API_KEY = 'YOUR_OPENWEATHER_API_KEY'; // Get your own free key from openweathermap.org
+            
+            // --- Element References ---
+            const chatContainer = document.getElementById('chat-container');
+            const chatWindow = document.getElementById('chat-window');
+            const chatInput = document.getElementById('chat-input');
+            const actionBtn = document.getElementById('action-btn');
+            const actionBtnIcon = document.getElementById('action-btn-icon');
+            const attachmentBtn = document.getElementById('attachment-btn');
+            const attachmentOptions = document.getElementById('attachment-options');
+            const uploadBtnMenu = document.getElementById('upload-btn-menu');
+            const cameraBtn = document.getElementById('camera-btn');
+            const imageUploadInput = document.getElementById('image-upload-input');
+            const cameraInput = document.getElementById('camera-input');
+            const escalateBtn = document.getElementById('escalate-btn');
+            const langToggleBtn = document.getElementById('lang-toggle-btn');
+            const toast = document.getElementById('toast');
+            const typingIndicatorContainer = document.getElementById('typing-indicator-container');
+            const imageModal = document.getElementById('image-modal');
+            const modalImage = document.getElementById('modal-image');
+            const modalCloseBtn = document.getElementById('modal-close-btn');
+            const imagePreviewContainer = document.getElementById('image-preview-container');
+            const previewImage = document.getElementById('preview-image');
+            const removeImageBtn = document.getElementById('remove-image-btn');
+            const actionButtonsContainer = document.getElementById('action-buttons-container');
+
+            // --- State ---
+            let conversationHistory = [];
+            let currentImageBase64 = null;
+            const userLocation = { name: "Visakhapatnam", lat: 17.70, lon: 83.29, state: "Andhra Pradesh" };
+            const languages = ['en-US', 'te-IN', 'ml-IN'];
+            let currentLangIndex = 0;
+            let isRecording = false;
+            let isSmartToolsOpen = true; // State for the toggle
+
+            // --- Language Data & Smart Tools Configuration ---
+            const langData = {
+                'ml-IN': { 
+                    greeting: 'നമസ്കാരം! ഞാൻ നിങ്ങളുടെ ഡിജിറ്റൽ കൃഷി ഓഫീസർ ആണ്. നിങ്ങൾക്ക് എന്ത് സഹായമാണ് വേണ്ടത്?', 
+                    placeholder: 'എന്തെങ്കിലും ചോയിക്കൂ...', imageSelected: 'ചിത്രം തിരഞ്ഞെടുത്തു', langName: 'മലയാളം',
+                    smartTools: [
+                        { icon: 'fa-bug', text: 'കീട/രോഗ നിർണ്ണയം'},
+                        { icon: 'fa-vial', text: 'വളം കാൽക്കുലേറ്റർ'},
+                        { icon: 'fa-calendar-alt', text: 'കൃഷി പ്ലാൻ'},
+                        { icon: 'fa-landmark', text: 'സർക്കാർ പദ്ധതികൾ'},
+                        { icon: 'fa-cloud-sun', text: 'കാലാവസ്ഥ'},
+                        { icon: 'fa-rupee-sign', text: 'വിപണി വില'}
+                    ],
+                    quickReplies: ['ജലസേചനം', 'വിപണനം', 'കീടനാശിനി'],
+                    diagnosisPrompt: 'ദയവായി ഈ ചെടിയിലെ കീടങ്ങളെ/രോഗത്തെ പരിശോധിക്കുക.',
+                    fertilizerPrompt: 'വിളയും സ്ഥലവും നൽകുക (ഉദാ: നെല്ല്, 2 ഏക്കർ):',
+                    farmingPlanPrompt: 'വിളയും സ്ഥലവും നൽകുക (ഉദാ: തക്കാളി, 1 ഏക്കർ):',
+                    mandiPrompt: 'ഏത് വിളയുടെ വിപണി വിലയാണ് അറിയേണ്ടത്? (ഉദാ: ഉള്ളി വില)'
+                },
+                'te-IN': { 
+                    greeting: 'నమస్కారం! నేను మీ డిజిటల్ కృషి ఆఫీసర్. నేను మీకు ఎలా సహాయపడగలను?', 
+                    placeholder: 'ఏదైనా అడగండి...', imageSelected: 'చిత్రం ఎంపిక చేయబడింది', langName: 'తెలుగు',
+                    smartTools: [
+                        { icon: 'fa-bug', text: 'తెగులు/వ్యాధి నిర్ధారణ'},
+                        { icon: 'fa-vial', text: 'ఎరువుల కాలిక్యులేటర్'},
+                        { icon: 'fa-calendar-alt', text: 'వ్యవసాయ ప్రణాళిక'},
+                        { icon: 'fa-landmark', text: 'ప్రభుత్వ పథకాలు'},
+                        { icon: 'fa-cloud-sun', text: 'వాతావరణం'},
+                        { icon: 'fa-rupee-sign', text: 'మండీ ధరలు'}
+                    ],
+                    quickReplies: ['నీటిపారుదల', 'మార్కెటింగ్', 'పురుగుమందులు'],
+                    diagnosisPrompt: 'దయచేసి ఈ మొక్కపై ఉన్న తెగులు/వ్యాధిని నిర్ధారించండి.',
+                    fertilizerPrompt: 'పంట మరియు భూమి వివరాలను అందించండి (ఉదా: వరి, 2 ఎకరాలు):',
+                    farmingPlanPrompt: 'పంట మరియు భూమి వివరాలను అందించండి (ఉదా: టమోటా, 1 ఎకరం):',
+                    mandiPrompt: 'ఏ పంట మార్కెట్ ధరను మీరు తెలుసుకోవాలనుకుంటున్నారు? (ఉదా: ఉల్లిపాయ ధర)'
+                },
+                'en-US': { 
+                    greeting: 'Hello! I am your Digital Krishi Officer. How can I assist you today?', 
+                    placeholder: 'Ask me anything...', imageSelected: 'Image selected', langName: 'English',
+                    smartTools: [
+                        { icon: 'fa-bug', text: 'Pest & Disease Guide'},
+                        { icon: 'fa-vial', text: 'Fertilizer Calculator'},
+                        { icon: 'fa-calendar-alt', text: 'Farming Plan'},
+                        { icon: 'fa-landmark', text: 'Govt. Schemes'},
+                        { icon: 'fa-cloud-sun', text: 'Live Weather'},
+                        { icon: 'fa-rupee-sign', text: 'Mandi Prices'}
+                    ],
+                    quickReplies: ['Irrigation', 'Marketing', 'Pesticides'],
+                    diagnosisPrompt: 'Please identify the pest/disease on this plant.',
+                    fertilizerPrompt: 'Enter crop and land area (e.g., Rice, 2 acres):',
+                    farmingPlanPrompt: 'Enter crop and land area (e.g., Tomato, 1 acre):',
+                    mandiPrompt: 'What crop price are you looking for? (e.g., Onion price)'
+                }
+            };
+
+            // --- Core Functions ---
+
+            function updateUIForLanguage() {
+                const currentLang = languages[currentLangIndex];
+                chatInput.placeholder = langData[currentLang].placeholder;
+                chatWindow.innerHTML = ''; 
+                conversationHistory = [];
+                addMessageToChat({
+                    type: 'ai',
+                    text: langData[currentLang].greeting,
+                    time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                });
+                renderActionButtons();
+                showToast(`Language set to ${langData[currentLang].langName}`);
+            }
+
+            function showToast(message) {
+                toast.textContent = message;
+                toast.classList.remove('hidden', 'opacity-0');
+                setTimeout(() => {
+                     toast.classList.add('opacity-0');
+                     setTimeout(() => toast.classList.add('hidden'), 300);
+                }, 2500);
+            }
+
+            function addMessageToChat(message) {
+                const wrapper = document.createElement('div');
+                wrapper.className = `w-full flex flex-col new-message ${message.type === 'user' ? 'items-end' : 'items-start'}`;
+
+                const bubble = document.createElement('div');
+                bubble.className = `chat-bubble ${message.type === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai'}`;
+
+                let contentHTML = '';
+                if (message.image) {
+                    contentHTML += `<img src="${message.image}" alt="Uploaded content" class="rounded-lg mb-2 w-full max-w-xs cursor-pointer" onclick="openImageModal('${message.image}')">`;
+                }
+                 if (message.audio) {
+                    contentHTML += `<audio controls src="${message.audio}" class="w-full my-2"></audio>`;
+                }
+                
+                let formattedText = (message.text || "")
+                    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-100 p-2 rounded-md text-sm my-2 whitespace-pre-wrap"><code>$1</code></pre>')
+                    .replace(/\n\s*([*•-])\s/g, '<br>• ')
+                    .replace(/\n/g, '<br>');
+
+                const textElement = document.createElement('div');
+                textElement.innerHTML = formattedText;
+                
+                const metadata = document.createElement('div');
+                metadata.className = 'flex justify-end items-center mt-1.5';
+                
+                const timeElement = document.createElement('span');
+                timeElement.className = 'timestamp';
+                timeElement.textContent = message.time;
+
+                metadata.appendChild(timeElement);
+                
+                if (message.type === 'user') {
+                    const ticks = document.createElement('span');
+                    ticks.className = 'ticks';
+                    ticks.innerHTML = '<i class="fas fa-check-double"></i>';
+                    metadata.appendChild(ticks);
+                }
+                
+                bubble.innerHTML = contentHTML;
+                bubble.appendChild(textElement);
+                bubble.appendChild(metadata);
+
+                if (message.type === 'ai') {
+                    const controlsWrapper = document.createElement('div');
+                    controlsWrapper.className = "absolute -top-1 -right-1 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300";
+
+                    const copyButton = document.createElement('button');
+                    copyButton.innerHTML = '<i class="fas fa-copy"></i>';
+                    copyButton.className = "bg-white/80 backdrop-blur-sm text-gray-500 hover:text-gray-800 w-6 h-6 rounded-full flex items-center justify-center shadow-md transition-colors text-xs";
+                    copyButton.title = "Copy text";
+                    copyButton.onclick = () => copyMessageToClipboard(message.text);
+                    
+                    const ttsButton = document.createElement('button');
+                    ttsButton.innerHTML = '<i class="fas fa-volume-up"></i>';
+                    ttsButton.className = "bg-white/80 backdrop-blur-sm text-gray-500 hover:text-gray-800 w-6 h-6 rounded-full flex items-center justify-center shadow-md transition-colors text-xs";
+                    ttsButton.title = "Read aloud";
+                    ttsButton.onclick = () => speak(message.text);
+
+                    controlsWrapper.appendChild(copyButton);
+                    controlsWrapper.appendChild(ttsButton);
+                    bubble.classList.add('group');
+                    bubble.appendChild(controlsWrapper);
+                }
+
+                wrapper.appendChild(bubble);
+                chatWindow.appendChild(wrapper);
+                
+                const existingSpacer = document.getElementById('chat-scroll-spacer');
+                if (existingSpacer) {
+                    existingSpacer.remove();
+                }
+                const spacer = document.createElement('div');
+                spacer.id = 'chat-scroll-spacer';
+                chatWindow.appendChild(spacer);
+                spacer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }
+
+            // --- API-Powered Features ---
+
+            async function getWeather() {
+                addMessageToChat({ type: 'user', text: 'Live Weather', time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) });
+                typingIndicatorContainer.classList.remove('hidden');
+
+                if (!OPENWEATHER_API_KEY || OPENWEATHER_API_KEY === 'YOUR_OPENWEATHER_API_KEY') {
+                    addMessageToChat({type: 'ai', text: 'Weather API key is not configured. Please get a free key from openweathermap.org and add it to the script.', time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) });
+                    typingIndicatorContainer.classList.add('hidden');
+                    return;
+                }
+
+                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${userLocation.lat}&lon=${userLocation.lon}&appid=${OPENWEATHER_API_KEY}&units=metric`;
+                
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            throw new Error('The Weather API key is invalid or expired. Please get a new key from openweathermap.org.');
+                        }
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    
+                    const weatherReport = `**Weather in ${userLocation.name}:**\n• **Condition:** ${data.weather[0].main} (${data.weather[0].description})\n• **Temperature:** ${data.main.temp}°C\n• **Feels like:** ${data.main.feels_like}°C\n• **Humidity:** ${data.main.humidity}%\n• **Wind:** ${data.wind.speed} m/s`;
+                    addMessageToChat({ type: 'ai', text: weatherReport, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) });
+                } catch (error) {
+                    console.error("Weather API error:", error);
+                    addMessageToChat({ type: 'ai', text: `Sorry, I couldn't fetch the weather. **Error:** ${error.message}`, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) });
+                } finally {
+                    typingIndicatorContainer.classList.add('hidden');
+                }
+            }
+            
+            async function getFarmingPlan(details) {
+                if (!details || details.trim() === '') {
+                    renderActionButtons();
+                    return;
+                }
+                const userQuery = `Generate a farming plan for ${details}`;
+                const planPrompt = `Create a simplified, month-by-month farming plan for growing ${details} in ${userLocation.name}. The plan should be easy for a farmer to understand. Include key stages like Land Preparation, Sowing, Fertilization & Irrigation, Pest & Disease Management, and Harvesting. Provide a timeline and simple instructions.`;
+                addMessageToChat({ type: 'user', text: userQuery, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) });
+                await getAIResponse(planPrompt, null);
+            }
+
+            async function getFertilizerRecommendation(details) {
+                if (!details || details.trim() === '') {
+                    renderActionButtons();
+                    return;
+                }
+                const userQuery = `Calculate fertilizer for ${details}`;
+                const fertilizerPrompt = `Act as an agricultural expert for a farmer in ${userLocation.name}. The farmer wants to grow ${details}. Provide a fertilizer recommendation with the following exact markdown headings: **Crop:**, **Nutrient Requirement (per acre):**, **Fertilizer Schedule:**. Under the schedule, detail the amounts for Basal Application and Top Dressing stages. Keep the language simple and clear.`;
+                addMessageToChat({ type: 'user', text: userQuery, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) });
+                await getAIResponse(fertilizerPrompt, null);
+            }
+
+            async function getGovtSchemes() {
+                 const userQuery = `Find relevant government schemes`;
+                 const schemesPrompt = `As an agricultural expert for a farmer in ${userLocation.name}, ${userLocation.state}, list and briefly explain 3-4 of the most relevant and beneficial government schemes currently available. Focus on schemes related to crop insurance, subsidies, or direct benefit transfers. For each scheme, provide these exact markdown headings: **Scheme Name:**, **Key Benefit:**, and **How to Apply:**.`;
+                 addMessageToChat({ type: 'user', text: userQuery, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) });
+                 await getAIResponse(schemesPrompt, null);
+            }
+
+            async function getMandiPricesAI(query) {
+                if (!query || query.trim() === '') {
+                    renderActionButtons();
+                    return;
+                }
+                const userQuery = `Find Mandi prices for: ${query}`;
+                const mandiPrompt = `You are a market expert for an Indian farmer located in ${userLocation.name}, ${userLocation.state}. The user is asking for the market price of "${query}". Use your real-time search capabilities to find the most recent prices from nearby Mandis. Provide a concise summary. If possible, list prices from 2-3 different markets for comparison. Format the response clearly using markdown.`;
+                addMessageToChat({ type: 'user', text: userQuery, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) });
+                await getAIResponse(mandiPrompt, null, true); // true enables search grounding
+            }
+
+
+            // --- Gemini (LLM) Functions ---
+
+             async function getAIResponse(prompt, base64ImageData, useSearchGrounding = false) {
+                typingIndicatorContainer.classList.remove('hidden');
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+                actionButtonsContainer.innerHTML = ''; // Hide buttons during response generation
+
+                if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY') {
+                    addMessageToChat({type: 'ai', text: 'The core AI is not configured. Please get a free Gemini API key from Google AI Studio and add it to the script.', time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) });
+                    typingIndicatorContainer.classList.add('hidden');
+                    renderActionButtons();
+                    return;
+                }
+
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GEMINI_API_KEY}`;
+
+                const currentLang = languages[currentLangIndex];
+                const langName = langData[currentLang].langName;
+                const systemPrompt = `You are a friendly and expert AI Krishi Officer for Indian farmers. Your goal is to provide accurate, concise, and actionable advice. Respond ONLY in ${langName}. Use the user's location (${userLocation.name}, ${userLocation.state}) for context-aware advice.
+                You have several special capabilities. When one is triggered, you MUST use the exact markdown headings requested:
+                1. **Pest & Disease Guide:** When a user uploads an image of a plant, provide a diagnosis. Headings: **Identification:**, **Symptoms:**, **Recommended Treatment:**, and **Prevention:**.
+                2. **Fertilizer Calculator:** Headings: **Crop:**, **Nutrient Requirement (per acre):**, **Fertilizer Schedule:**.
+                3. **Farming Plan:** Provide a simplified, schedule-based plan with clear stages (e.g., Land Preparation, Sowing, etc.).
+                4. **Government Schemes:** List relevant schemes. Headings: **Scheme Name:**, **Key Benefit:**, and **How to Apply:**.
+                5. **Mandi Prices:** When asked for market prices, use your search tool to find real-time data and summarize it clearly.
+                For all other queries, provide a conversational response. Use simple language and markdown.`;
+
+                let userParts = [{ text: prompt }];
+                if (base64ImageData) {
+                    userParts.push({ inlineData: { mimeType: "image/jpeg", data: base64ImageData } });
+                }
+
+                conversationHistory.push({ role: "user", parts: userParts });
+                
+                const payload = { 
+                    contents: conversationHistory, 
+                    systemInstruction: { parts: [{ text: systemPrompt }] } 
+                };
+
+                if (useSearchGrounding) {
+                    payload.tools = [{ "google_search": {} }];
+                }
+
+                try {
+                    const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(`API Error: ${errorData.error?.message || response.statusText}`);
+                    }
+                    const result = await response.json();
+                    const aiText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (aiText) {
+                        conversationHistory.push({ role: "model", parts: [{ text: aiText }] });
+                        addMessageToChat({ type: 'ai', text: aiText, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) });
+                    } else { throw new Error("Invalid or empty response from AI."); }
+                } catch (error) {
+                    console.error("Error fetching AI response:", error);
+                    addMessageToChat({ type: 'ai', text: `Sorry, an error occurred: ${error.message}`, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) });
+                } finally {
+                    typingIndicatorContainer.classList.add('hidden');
+                    renderActionButtons(); // Show buttons again
+                }
+            }
+
+            async function handleSend() {
+                 const text = chatInput.value.trim();
+                if (!text && !currentImageBase64) return;
+                
+                const messageTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                addMessageToChat({ 
+                    type: 'user', 
+                    text: text || '', 
+                    image: currentImageBase64 ? `data:image/jpeg;base64,${currentImageBase64}` : null, 
+                    time: messageTime 
+                });
+
+                const imageToSend = currentImageBase64;
+                chatInput.value = '';
+                chatInput.dispatchEvent(new Event('input'));
+                resetImagePreview();
+
+                await getAIResponse(text, imageToSend);
+            }
+
+            // --- UI Rendering & Event Handlers ---
+            function renderActionButtons() {
+                actionButtonsContainer.innerHTML = '';
+                const currentLang = languages[currentLangIndex];
+                const smartTools = langData[currentLang].smartTools;
+                const quickReplies = langData[currentLang].quickReplies;
+                
+                const hubHeader = document.createElement('div');
+                hubHeader.className = 'flex justify-between items-center pt-4 pb-2 cursor-pointer';
+
+                const actionHubTitle = document.createElement('h3');
+                actionHubTitle.className = 'text-sm font-bold text-text-primary';
+                actionHubTitle.textContent = 'Smart Tools';
+                
+                const toggleButton = document.createElement('button');
+                toggleButton.className = 'text-text-secondary hover:bg-gray-200 rounded-full w-8 h-8 flex items-center justify-center transition-transform duration-300';
+                toggleButton.innerHTML = `<i class="fas fa-chevron-down"></i>`;
+                
+                hubHeader.appendChild(actionHubTitle);
+                hubHeader.appendChild(toggleButton);
+                actionButtonsContainer.appendChild(hubHeader);
+                
+                const contentWrapper = document.createElement('div');
+                contentWrapper.id = 'smart-tools-content';
+                contentWrapper.className = 'transition-all duration-300 ease-in-out';
+
+                const smartToolsWrapper = document.createElement('div');
+                smartToolsWrapper.className = 'grid grid-cols-3 gap-3 pb-3';
+                smartTools.forEach((tool, index) => {
+                    const button = document.createElement('button');
+                    button.innerHTML = `<i class="fas ${tool.icon} text-xl mb-1.5"></i><span class="font-semibold text-xs text-center">${tool.text}</span>`;
+                    button.className = "smart-tool-btn text-text-primary p-3 rounded-xl flex flex-col items-center justify-center transition-all duration-300 aspect-square";
+                    button.onclick = () => handleSmartToolClick(index);
+                    smartToolsWrapper.appendChild(button);
+                });
+                contentWrapper.appendChild(smartToolsWrapper);
+
+                const quickRepliesWrapper = document.createElement('div');
+                quickRepliesWrapper.className = 'flex flex-wrap items-center justify-center gap-2 pt-3 pb-3 border-t border-gray-200';
+                 quickReplies.forEach(replyText => {
+                    const button = document.createElement('button');
+                    button.textContent = replyText;
+                    button.className = "bg-gray-100 hover:bg-gray-200 text-xs font-medium text-text-secondary py-1.5 px-4 rounded-full transition-colors";
+                    button.onclick = () => handleQuickReply(replyText);
+                    quickRepliesWrapper.appendChild(button);
+                });
+                contentWrapper.appendChild(quickRepliesWrapper);
+
+                actionButtonsContainer.appendChild(contentWrapper);
+
+                const toggleAction = () => {
+                    isSmartToolsOpen = !isSmartToolsOpen;
+                    contentWrapper.classList.toggle('hidden', !isSmartToolsOpen);
+                    toggleButton.classList.toggle('rotate-180', isSmartToolsOpen);
+                };
+                
+                // Set initial state based on the isSmartToolsOpen flag
+                contentWrapper.classList.toggle('hidden', !isSmartToolsOpen);
+                toggleButton.classList.toggle('rotate-180', isSmartToolsOpen);
+
+                hubHeader.addEventListener('click', toggleAction);
+            }
+            
+            function handleSmartToolClick(index) {
+                const currentLang = languages[currentLangIndex];
+                if (index === 0) { // Pest & Disease Guide
+                    window.diagnosisFlow = true;
+                    showToast('Please select a photo of the crop.');
+                    cameraBtn.click();
+                } else if (index === 1) { // Fertilizer Calculator
+                    showFertilizerInput();
+                } else if (index === 2) { // Farming Plan
+                    showFarmingPlanInput();
+                } else if (index === 3) { // Govt. Schemes
+                    getGovtSchemes();
+                } else if (index === 4) { // Live Weather
+                    getWeather();
+                } else if (index === 5) { // Mandi Prices
+                    showMandiInput();
+                }
+            }
+
+            function showFarmingPlanInput() {
+                actionButtonsContainer.innerHTML = '';
+                const currentLang = languages[currentLangIndex];
+                
+                const form = document.createElement('form');
+                form.className = 'p-4 flex items-center gap-2';
+                form.onsubmit = (e) => {
+                    e.preventDefault();
+                    const input = form.querySelector('input');
+                    getFarmingPlan(input.value);
+                };
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.placeholder = langData[currentLang].farmingPlanPrompt;
+                input.className = 'flex-1 px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-[var(--primary-green)] focus:border-[var(--primary-green)] transition';
+                
+                const submitButton = document.createElement('button');
+                submitButton.type = 'submit';
+                submitButton.textContent = 'Generate';
+                submitButton.className = 'px-5 py-2 bg-[var(--primary-green)] text-white font-semibold rounded-full hover:bg-[var(--secondary-green)] transition-colors';
+
+                form.appendChild(input);
+                form.appendChild(submitButton);
+                actionButtonsContainer.appendChild(form);
+                input.focus();
+            }
+
+            function showFertilizerInput() {
+                actionButtonsContainer.innerHTML = '';
+                const currentLang = languages[currentLangIndex];
+                
+                const form = document.createElement('form');
+                form.className = 'p-4 flex items-center gap-2';
+                form.onsubmit = (e) => {
+                    e.preventDefault();
+                    const input = form.querySelector('input');
+                    getFertilizerRecommendation(input.value);
+                };
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.placeholder = langData[currentLang].fertilizerPrompt;
+                input.className = 'flex-1 px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-[var(--primary-green)] focus:border-[var(--primary-green)] transition';
+                
+                const submitButton = document.createElement('button');
+                submitButton.type = 'submit';
+                submitButton.textContent = 'Calculate';
+                submitButton.className = 'px-5 py-2 bg-[var(--primary-green)] text-white font-semibold rounded-full hover:bg-[var(--secondary-green)] transition-colors';
+
+                form.appendChild(input);
+                form.appendChild(submitButton);
+                actionButtonsContainer.appendChild(form);
+                input.focus();
+            }
+
+            function showMandiInput() {
+                actionButtonsContainer.innerHTML = '';
+                const currentLang = languages[currentLangIndex];
+                
+                const form = document.createElement('form');
+                form.className = 'p-4 flex items-center gap-2';
+                form.onsubmit = (e) => {
+                    e.preventDefault();
+                    const input = form.querySelector('input');
+                    getMandiPricesAI(input.value);
+                };
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.placeholder = langData[currentLang].mandiPrompt;
+                input.className = 'flex-1 px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-[var(--primary-green)] focus:border-[var(--primary-green)] transition';
+                
+                const submitButton = document.createElement('button');
+                submitButton.type = 'submit';
+                submitButton.textContent = 'Search';
+                submitButton.className = 'px-5 py-2 bg-[var(--primary-green)] text-white font-semibold rounded-full hover:bg-[var(--secondary-green)] transition-colors';
+
+                form.appendChild(input);
+                form.appendChild(submitButton);
+                actionButtonsContainer.appendChild(form);
+                input.focus();
+            }
+
+            function handleQuickReply(text) {
+                addMessageToChat({ 
+                    type: 'user', 
+                    text: text, 
+                    time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) 
+                });
+                getAIResponse(text, null);
+            }
+
+            function copyMessageToClipboard(text) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast('Copied to clipboard!');
+                }).catch(err => {
+                    showToast('Failed to copy text.');
+                });
+            }
+
+
+            // --- Speech Recognition (Microphone) ---
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            let recognition;
+
+            if (SpeechRecognition) {
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.lang = languages[currentLangIndex];
+                recognition.interimResults = false;
+                recognition.maxAlternatives = 1;
+
+                recognition.onresult = (event) => {
+                    const speechResult = event.results[0][0].transcript;
+                    chatInput.value = speechResult;
+                    chatInput.dispatchEvent(new Event('input')); // Update send button icon
+                    // Automatically send the message after transcription
+                    if(speechResult) {
+                        handleSend();
+                    }
+                };
+                
+                recognition.onspeechend = () => {
+                    if (isRecording) {
+                        recognition.stop();
+                        isRecording = false;
+                        actionBtn.classList.remove('mic-recording');
+                    }
+                };
+
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    showToast('Mic error: ' + event.error);
+                    isRecording = false;
+                    actionBtn.classList.remove('mic-recording');
+                };
+            } else {
+                console.warn("Speech Recognition not supported in this browser.");
+                showToast("Speech recognition is not supported on your browser.");
+            }
+            
+            function startRecording() {
+                if (!chatInput.value.trim() && SpeechRecognition && !isRecording) {
+                    try {
+                        recognition.lang = languages[currentLangIndex];
+                        recognition.start();
+                        isRecording = true;
+                        actionBtn.classList.add('mic-recording');
+                        showToast("Listening...");
+                    } catch(e) {
+                         console.error("Could not start recognition:", e);
+                         showToast('Mic could not be started.');
+                         isRecording = false;
+                         actionBtn.classList.remove('mic-recording');
+                    }
+                }
+            }
+            
+            function stopRecording() {
+                 if (isRecording) {
+                    recognition.stop();
+                    isRecording = false;
+                    actionBtn.classList.remove('mic-recording');
+                }
+            }
+
+            // --- Other UI Handlers (Attachments, Modals, etc.) ---
+            chatInput.addEventListener('input', () => {
+                const hasText = chatInput.value.trim().length > 0;
+                actionBtnIcon.className = hasText ? 'fas fa-paper-plane' : 'fas fa-microphone';
+                 actionBtnIcon.classList.toggle('text-lg', !hasText); // Make mic icon slightly bigger
+                actionBtn.classList.toggle('rotate-45', hasText);
+            });
+
+            actionBtn.addEventListener('click', () => {
+                if (chatInput.value.trim().length > 0 || currentImageBase64) {
+                    handleSend();
+                }
+            });
+
+            // Add both mouse and touch events for the microphone
+            actionBtn.addEventListener('mousedown', startRecording);
+            actionBtn.addEventListener('mouseup', stopRecording);
+            actionBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Prevent triggering mouse events on touch devices
+                startRecording();
+            });
+            actionBtn.addEventListener('touchend', stopRecording);
+
+
+            chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSend(); });
+
+            attachmentBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                attachmentOptions.classList.toggle('hidden');
+            });
+            attachmentOptions.addEventListener('click', (e) => e.stopPropagation()); // Prevent menu from closing when clicking inside it
+            document.body.addEventListener('click', () => attachmentOptions.classList.add('hidden'));
+            
+            uploadBtnMenu.addEventListener('click', (e) => { e.preventDefault(); imageUploadInput.click(); });
+            cameraBtn.addEventListener('click', () => { cameraInput.click(); });
+            
+            imageUploadInput.addEventListener('change', handleFileSelect);
+            cameraInput.addEventListener('change', handleFileSelect);
+
+            langToggleBtn.addEventListener('click', () => {
+                currentLangIndex = (currentLangIndex + 1) % languages.length;
+                updateUIForLanguage();
+            });
+
+            escalateBtn.addEventListener('click', () => {
+                if (OFFICER_MOBILE_NUMBER && OFFICER_MOBILE_NUMBER !== 'REPLACE_WITH_YOUR_MOBILE_NUMBER') {
+                    window.location.href = `tel:${OFFICER_MOBILE_NUMBER}`;
+                } else {
+                    showToast('Call feature is not yet configured.');
+                }
+            });
+            
+            function handleFileSelect(event) {
+                const file = event.target.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        currentImageBase64 = e.target.result.split(',')[1];
+                        previewImage.src = e.target.result;
+                        imagePreviewContainer.classList.remove('hidden');
+                        imagePreviewContainer.classList.add('flex');
+                        
+                        if (window.diagnosisFlow) {
+                            const currentLang = languages[currentLangIndex];
+                            chatInput.value = langData[currentLang].diagnosisPrompt;
+                            chatInput.dispatchEvent(new Event('input'));
+                            window.diagnosisFlow = false;
+                        } else {
+                            showToast(langData[languages[currentLangIndex]].imageSelected);
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+                event.target.value = null;
+            }
+            
+            function resetImagePreview() {
+                currentImageBase64 = null;
+                imagePreviewContainer.classList.add('hidden');
+                imagePreviewContainer.classList.remove('flex');
+                previewImage.src = '';
+            }
+
+            removeImageBtn.addEventListener('click', resetImagePreview);
+
+            window.openImageModal = (src) => {
+                modalImage.src = src;
+                imageModal.classList.remove('hidden');
+            }
+            const closeImageModal = () => imageModal.classList.add('hidden');
+            modalCloseBtn.addEventListener('click', closeImageModal);
+            imageModal.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeImageModal(); });
+
+            const synth = window.speechSynthesis;
+            let voices = [];
+
+            function loadVoices() {
+                voices = synth.getVoices();
+            }
+            if (synth.onvoiceschanged !== undefined) {
+                synth.onvoiceschanged = loadVoices;
+            }
+            loadVoices();
+
+            function speak(text) {
+                if (!text || text.trim() === '') return;
+                if (synth.speaking) {
+                    synth.cancel();
+                }
+                setTimeout(() => {
+                    const utterThis = new SpeechSynthesisUtterance(text);
+                    const currentLang = languages[currentLangIndex];
+                    const voice = voices.find(v => v.lang.replace('_', '-') === currentLang);
+                    if (voice) utterThis.voice = voice;
+                    utterThis.lang = currentLang;
+                    utterThis.onerror = (event) => {
+                        console.error('SpeechSynthesisUtterance.onerror', event);
+                        showToast(`Audio error: ${event.error}`);
+                    };
+                    synth.speak(utterThis);
+                }, 100);
+            }
+
+            function setAppHeight() { chatContainer.style.height = `${window.innerHeight}px`; }
+            if (window.innerWidth < 768) {
+                window.addEventListener('resize', setAppHeight);
+                setAppHeight();
+            }
+
+            updateUIForLanguage();
+
+        });
+    </script>
+    <script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js')
+      .then(() => console.log("✅ Service Worker registered"))
+      .catch(err => console.log("⚠️ SW failed:", err));
+  }
+</script>
+
+</body>
+</html>
+
